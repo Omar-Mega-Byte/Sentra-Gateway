@@ -1,0 +1,94 @@
+spring:
+  application:
+    name: ${SERVICE_NAME:user-service}
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+
+server:
+  port: ${SERVER_PORT:8081}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  server:
+    port: ${MANAGEMENT_PORT:${SERVER_PORT:8081}}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    enable:
+      all: ${METRICS_ENABLED:true}
+    tags:
+      application: ${SERVICE_NAME:user-service}
+      environment: ${SENTRA_ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_ENABLED:false}
+    path: /v3/api-docs
+    version: openapi_3_1
+  swagger-ui:
+    enabled: ${SWAGGER_UI_ENABLED:false}
+    path: /swagger-ui.html
+    display-request-duration: true
+    operations-sorter: method
+    tags-sorter: alpha
+
+sentra:
+  user:
+    environment: ${SENTRA_ENVIRONMENT:local}
+    instance-id: ${SENTRA_INSTANCE_ID:${random.uuid}}
+    service-name: ${SERVICE_NAME:user-service}
+    shutdown-timeout: ${SHUTDOWN_TIMEOUT:20s}
+    repository:
+      mode: ${PROFILE_REPOSITORY_MODE:memory}
+      seed-enabled: ${PROFILE_SEED_ENABLED:false}
+      email-unique: ${PROFILE_EMAIL_UNIQUE:true}
+    gateway:
+      context-required: ${GATEWAY_CONTEXT_REQUIRED:true}
+      allowed-route-ids: ${GATEWAY_ALLOWED_ROUTE_IDS:user-public-profile,user-profile-read,user-profile-update}
+      allowed-peers: ${GATEWAY_ALLOWED_PEERS:}
+      trusted-header-max-length: ${TRUSTED_HEADER_MAX_LENGTH:255}
+      request-id-max-length: ${REQUEST_ID_MAX_LENGTH:128}
+    limits:
+      max-request-body-bytes: ${MAX_REQUEST_BODY_BYTES:16384}
+      max-display-name-length: ${MAX_DISPLAY_NAME_LENGTH:100}
+      max-bio-length: ${MAX_BIO_LENGTH:500}
+      max-avatar-url-length: ${MAX_AVATAR_URL_LENGTH:2048}
+      max-email-length: ${MAX_EMAIL_LENGTH:254}
+      max-locale-length: ${MAX_LOCALE_LENGTH:35}
+      max-timezone-length: ${MAX_TIMEZONE_LENGTH:64}
+      max-error-details: ${MAX_ERROR_DETAILS:20}
+    public-profile:
+      enabled: ${PUBLIC_PROFILE_ENABLED:true}
+      cache-control: ${PUBLIC_PROFILE_CACHE_CONTROL:public, max-age=60}
+      not-found-cache-control: ${PUBLIC_PROFILE_NOT_FOUND_CACHE_CONTROL:no-store}
+    management:
+      port: ${MANAGEMENT_PORT:${SERVER_PORT:8081}}
+      allowed-cidrs: ${MANAGEMENT_ALLOWED_CIDRS:}
+      openapi-enabled: ${OPENAPI_ENABLED:false}
+      swagger-ui-enabled: ${SWAGGER_UI_ENABLED:false}
+      metrics-enabled: ${METRICS_ENABLED:true}
+    logging:
+      include-profile-ids: ${LOG_INCLUDE_PROFILE_IDS:false}
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.omar.sentra.user: INFO
