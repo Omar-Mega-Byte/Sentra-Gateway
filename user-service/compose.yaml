@@ -1,0 +1,33 @@
+name: sentra-user
+
+services:
+  user-service:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/sentra/user-service:1.0.0
+    env_file: .env
+    expose:
+      - "8081"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8081/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 12
+    networks:
+      - services
+      - operations
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  services:
+    external: true
+    name: ${SENTRA_SERVICES_NETWORK:-sentra-gateway_services}
+  operations:
+    name: sentra-user-operations
+    internal: true
