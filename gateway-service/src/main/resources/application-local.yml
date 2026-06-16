@@ -1,0 +1,23 @@
+sentra:
+  security:
+    api-key-pepper: ${API_KEY_PEPPER:local-development-pepper-change-before-production-32bytes}
+    local-auth-enabled: true
+    local-users:
+      admin:
+        username: ${LOCAL_ADMIN_USERNAME:admin}
+        password: ${LOCAL_ADMIN_PASSWORD:sentra-admin}
+      operator:
+        username: ${LOCAL_OPERATOR_USERNAME:operator}
+        password: ${LOCAL_OPERATOR_PASSWORD:sentra-operator}
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ""
+
+management:
+  endpoint:
+    health:
+      show-details: always

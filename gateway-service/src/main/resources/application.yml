@@ -1,0 +1,101 @@
+spring:
+  application:
+    name: gateway-service
+  main:
+    web-application-type: reactive
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:sentra_gateway}
+    user: ${DB_USERNAME:sentra}
+    password: ${DB_PASSWORD:sentra_local_password}
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:sentra_gateway}
+    username: ${DB_USERNAME:sentra}
+    password: ${DB_PASSWORD:sentra_local_password}
+    pool:
+      initial-size: ${DB_POOL_MIN_SIZE:2}
+      max-size: ${DB_POOL_MAX_SIZE:20}
+      max-acquire-time: ${DB_CONNECT_TIMEOUT:2s}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:sentra_local_redis}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:1s}
+      timeout: ${REDIS_COMMAND_TIMEOUT:500ms}
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes: []
+          metrics:
+            enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:}
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${SENTRA_ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
+    persist-authorization: true
+    operations-sorter: method
+    tags-sorter: alpha
+
+sentra:
+  environment: ${SENTRA_ENVIRONMENT:local}
+  instance-id: ${SENTRA_INSTANCE_ID:${random.uuid}}
+  security:
+    local-auth-enabled: false
+    api-key-pepper: ${API_KEY_PEPPER:}
+    trusted-proxy-cidrs: ${TRUSTED_PROXY_CIDRS:}
+    request-id-max-length: ${REQUEST_ID_MAX_LENGTH:128}
+    signing:
+      timestamp-skew: ${SIGNING_TIMESTAMP_SKEW:5m}
+      nonce-ttl: ${SIGNING_NONCE_TTL:10m}
+  routing:
+    allowed-schemes: ${ROUTE_ALLOWED_SCHEMES:http,https}
+    allowed-service-hosts: ${ROUTE_ALLOWED_SERVICE_HOSTS:}
+    refresh-interval: ${ROUTE_REFRESH_INTERVAL:30s}
+  limits:
+    max-request-header-bytes: ${MAX_REQUEST_HEADER_BYTES:32768}
+    max-request-body-bytes: ${MAX_REQUEST_BODY_BYTES:10485760}
+    max-signed-body-bytes: ${MAX_SIGNED_BODY_BYTES:1048576}
+  audit:
+    search-max-range: ${AUDIT_SEARCH_MAX_RANGE:31d}
+
+logging:
+  level:
+    root: INFO
+    com.omar.sentra.gateway: INFO
