@@ -3,6 +3,7 @@ DROP ALL OBJECTS;
 CREATE TABLE gateway_routes (
     id VARCHAR(120) PRIMARY KEY, category VARCHAR(20) NOT NULL, path_patterns TEXT NOT NULL,
     methods TEXT NOT NULL, target_uri VARCHAR(1000) NOT NULL, strip_prefix INTEGER NOT NULL,
+    rewrite_regex VARCHAR(500), rewrite_replacement VARCHAR(500),
     route_order INTEGER NOT NULL, enabled BOOLEAN NOT NULL, authentication_types TEXT NOT NULL,
     required_roles TEXT NOT NULL, required_scopes TEXT NOT NULL, signing_required BOOLEAN NOT NULL,
     rate_limit_policy_id VARCHAR(120), ip_policy_id VARCHAR(120), risk_policy_id VARCHAR(120),

@@ -43,7 +43,7 @@ class RouteServiceTest {
 
     private RouteRequest route(String id, String path, String target) {
         return new RouteRequest(
-                id, RouteCategory.USER, List.of(path), List.of("GET"), target, 0, 100, true,
+                id, RouteCategory.USER, List.of(path), List.of("GET"), target, 0, null, null, 100, true,
                 List.of("JWT"), List.of(), List.of("orders:read"), false, null, null, null,
                 1000, 3000, new RouteRequest.RetryPolicy(true, 2, List.of("GET")),
                 new RouteRequest.CircuitBreakerPolicy(true, "orders"), "DENIALS_AND_MUTATIONS", 0);

@@ -1,0 +1,33 @@
+INSERT INTO gateway_routes (
+    id, category, path_patterns, methods, target_uri, strip_prefix,
+    rewrite_regex, rewrite_replacement, route_order, enabled,
+    authentication_types, required_roles, required_scopes, signing_required,
+    connect_timeout_ms, response_timeout_ms, retry_enabled, retry_max_attempts,
+    retry_methods, circuit_breaker_enabled, circuit_breaker_name, audit_mode,
+    version, created_at, updated_at
+) VALUES
+('partner-payment-read', 'PARTNER', '/api/v1/partner/payments/*', 'GET', 'http://payment-service:8083', 0,
+ '/api/v1/partner/payments/(?<id>[^/]+)', '/internal/v1/payments/${id}', 300, TRUE,
+ 'API_KEY', '', 'payments:read', FALSE, 1000, 3000, TRUE, 2, 'GET', TRUE, 'payment-service', 'DENIALS_AND_MUTATIONS',
+ 1, now(), now()),
+('partner-payment-create', 'PARTNER', '/api/v1/partner/payments', 'POST', 'http://payment-service:8083', 0,
+ '/api/v1/partner/payments', '/internal/v1/payments', 301, TRUE,
+ 'API_KEY', '', 'payments:write', TRUE, 1000, 3000, FALSE, 1, '', TRUE, 'payment-service', 'DENIALS_AND_MUTATIONS',
+ 1, now(), now()),
+('partner-refund-create', 'PARTNER', '/api/v1/partner/refunds', 'POST', 'http://payment-service:8083', 0,
+ '/api/v1/partner/refunds', '/internal/v1/refunds', 302, TRUE,
+ 'API_KEY', '', 'refunds:write', TRUE, 1000, 3000, FALSE, 1, '', TRUE, 'payment-service', 'DENIALS_AND_MUTATIONS',
+ 1, now(), now()),
+('notifications-list', 'USER', '/api/v1/notifications', 'GET', 'http://notification-service:8084', 0,
+ '/api/v1/notifications', '/internal/v1/notifications', 400, TRUE,
+ 'JWT', '', 'notifications:read', FALSE, 1000, 2000, TRUE, 2, 'GET', TRUE, 'notification-service', 'DENIALS_AND_MUTATIONS',
+ 1, now(), now()),
+('notification-preferences-update', 'USER', '/api/v1/notifications/preferences', 'POST', 'http://notification-service:8084', 0,
+ '/api/v1/notifications/preferences', '/internal/v1/preferences', 401, TRUE,
+ 'JWT', '', 'notifications:write', FALSE, 1000, 3000, FALSE, 1, '', TRUE, 'notification-service', 'DENIALS_AND_MUTATIONS',
+ 1, now(), now()),
+('admin-test-notification', 'ADMIN', '/api/v1/admin/test-notification', 'POST', 'http://notification-service:8084', 0,
+ '/api/v1/admin/test-notification', '/internal/v1/test', 410, TRUE,
+ 'JWT', 'NOTIFICATION_ADMIN', '', FALSE, 1000, 3000, FALSE, 1, '', TRUE, 'notification-service', 'DENIALS_AND_MUTATIONS',
+ 1, now(), now())
+ON CONFLICT (id) DO NOTHING;
