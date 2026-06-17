@@ -29,7 +29,14 @@ public class RequestContextGlobalFilter implements GlobalFilter, Ordered {
             "x-sentra-client-id",
             "x-sentra-route-id",
             "x-sentra-source-ip",
-            "x-sentra-auth-time");
+            "x-sentra-auth-time",
+            "x-sentra-signature-verified",
+            "x-sentra-signature-key-id",
+            "x-sentra-nonce-status",
+            "x-sentra-test-delay-millis",
+            "x-sentra-test-status",
+            "x-sentra-test-malformed",
+            "x-sentra-test-disconnect");
 
     private final SentraProperties properties;
     private final AuditService auditService;

@@ -41,7 +41,10 @@ public class SecurityConfig {
                         "GATEWAY_SECURITY_ADMIN",
                         "GATEWAY_AUDITOR",
                         "GATEWAY_OPERATOR",
-                        "GATEWAY_SUPER_ADMIN"
+                        "GATEWAY_SUPER_ADMIN",
+                        "USER_ADMIN",
+                        "ORDER_ADMIN",
+                        "NOTIFICATION_ADMIN"
                     };
             List<SimpleGrantedAuthority> authorities = new ArrayList<>();
             for (String role : roles) {
@@ -51,6 +54,8 @@ public class SecurityConfig {
             authorities.add(new SimpleGrantedAuthority("SCOPE_profile:write"));
             authorities.add(new SimpleGrantedAuthority("SCOPE_orders:read"));
             authorities.add(new SimpleGrantedAuthority("SCOPE_orders:write"));
+            authorities.add(new SimpleGrantedAuthority("SCOPE_notifications:read"));
+            authorities.add(new SimpleGrantedAuthority("SCOPE_notifications:write"));
             users.add(User.withUsername(configured.getUsername())
                     .password("{noop}" + configured.getPassword())
                     .authorities(authorities)

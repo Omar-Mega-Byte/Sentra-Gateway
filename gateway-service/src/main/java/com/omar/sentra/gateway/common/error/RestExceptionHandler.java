@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.support.WebExchangeBindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.reactive.resource.NoResourceFoundException;
 import org.springframework.web.server.ServerWebExchange;
 
 /**
@@ -41,6 +42,11 @@ public class RestExceptionHandler {
                         violation.getPropertyPath().toString(), "INVALID", violation.getMessage()))
                 .toList();
         return response(ErrorCode.GW_REQUEST_INVALID, ErrorCode.GW_REQUEST_INVALID.defaultMessage(), details, exchange);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> noResource(NoResourceFoundException exception, ServerWebExchange exchange) {
+        return response(ErrorCode.GW_ROUTE_NOT_FOUND, ErrorCode.GW_ROUTE_NOT_FOUND.defaultMessage(), List.of(), exchange);
     }
 
     @ExceptionHandler(Throwable.class)

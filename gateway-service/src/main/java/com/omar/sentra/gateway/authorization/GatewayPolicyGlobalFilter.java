@@ -11,7 +11,6 @@ import com.omar.sentra.gateway.security.apikey.ApiKeyService;
 import com.omar.sentra.gateway.security.ip.IpPolicyService;
 import com.omar.sentra.gateway.security.risk.RiskService;
 import com.omar.sentra.gateway.security.signing.RequestSigningService;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +40,25 @@ import reactor.core.publisher.Mono;
  */
 @Component
 public class GatewayPolicyGlobalFilter implements GlobalFilter, Ordered {
+    private static final Set<String> STRIPPED_CREDENTIAL_HEADERS = Set.of(
+            HttpHeaders.AUTHORIZATION,
+            HttpHeaders.COOKIE,
+            "Proxy-Authorization",
+            "Api-Key",
+            "X-API-Key",
+            "X-Signature",
+            "Signature",
+            "X-Hmac-Signature",
+            "X-Api-Signature",
+            "X-Request-Signature",
+            "X-Sentra-Key-Id",
+            "X-Sentra-Timestamp",
+            "X-Sentra-Nonce",
+            "X-Sentra-Signature",
+            "X-Sentra-Signature-Verified",
+            "X-Sentra-Signature-Key-Id",
+            "X-Sentra-Nonce-Status");
+
     private final ApiKeyService apiKeys;
     private final RequestSigningService signing;
     private final IpPolicyService ipPolicy;
@@ -73,17 +91,19 @@ public class GatewayPolicyGlobalFilter implements GlobalFilter, Ordered {
         String category = string(metadata, "sentra.category", "PUBLIC");
         String routeId = route.getId();
         String clientIp = exchange.getAttributeOrDefault(RequestAttributes.CLIENT_IP, "unknown");
+        boolean signingRequired = bool(metadata, "sentra.signingRequired");
         return ipPolicy.enforce(string(metadata, "sentra.ipPolicyId", null), routeId, clientIp)
                 .then(authenticate(exchange, metadata, routeId, category))
-                .flatMap(identity -> body(exchange, bool(metadata, "sentra.signingRequired"))
-                        .flatMap(body -> verifySigning(exchange, metadata, identity.apiKey(), body)
+                .flatMap(identity -> body(exchange, signingRequired)
+                        .flatMap(body -> verifySigning(exchange, signingRequired, identity.apiKey(), body)
                                 .then(risk.evaluate(string(metadata, "sentra.riskPolicyId", null), routeId, exchange))
                                 .flatMap(riskAction -> rateLimits.consume(
                                         string(metadata, "sentra.rateLimitPolicyId", null),
                                         identity.subject(),
                                         routeId,
                                         exchange.getRequest().getMethod().name()))
-                                .flatMap(decision -> forward(exchange, chain, routeId, identity, body, decision))));
+                                .flatMap(decision -> forward(
+                                        exchange, chain, routeId, identity, body, decision, signingRequired))));
     }
 
     @Override
@@ -160,8 +180,8 @@ public class GatewayPolicyGlobalFilter implements GlobalFilter, Ordered {
     }
 
     private Mono<Void> verifySigning(
-            ServerWebExchange exchange, Map<String, Object> metadata, ApiKeyPrincipal principal, byte[] body) {
-        if (!bool(metadata, "sentra.signingRequired")) {
+            ServerWebExchange exchange, boolean signingRequired, ApiKeyPrincipal principal, byte[] body) {
+        if (!signingRequired) {
             return Mono.empty();
         }
         if (principal == null) {
@@ -176,8 +196,9 @@ public class GatewayPolicyGlobalFilter implements GlobalFilter, Ordered {
             String routeId,
             Identity identity,
             byte[] body,
-            RateLimitDecision decision) {
-        ServerHttpRequest request = decorate(exchange, routeId, identity, body);
+            RateLimitDecision decision,
+            boolean signingRequired) {
+        ServerHttpRequest request = decorate(exchange, routeId, identity, body, signingRequired);
         if (decision.remaining() != Long.MAX_VALUE) {
             exchange.getResponse().getHeaders().set("RateLimit-Remaining", Long.toString(decision.remaining()));
         }
@@ -185,14 +206,10 @@ public class GatewayPolicyGlobalFilter implements GlobalFilter, Ordered {
     }
 
     private ServerHttpRequest decorate(
-            ServerWebExchange exchange, String routeId, Identity identity, byte[] body) {
+            ServerWebExchange exchange, String routeId, Identity identity, byte[] body, boolean signingRequired) {
         ServerHttpRequest base = exchange.getRequest().mutate()
                 .headers(headers -> {
-                    headers.remove("X-API-Key");
-                    headers.remove("X-Sentra-Key-Id");
-                    headers.remove("X-Sentra-Timestamp");
-                    headers.remove("X-Sentra-Nonce");
-                    headers.remove("X-Sentra-Signature");
+                    STRIPPED_CREDENTIAL_HEADERS.forEach(headers::remove);
                     headers.set("X-Sentra-Subject", identity.subject());
                     headers.set("X-Sentra-Actor-Type", identity.actorType());
                     headers.set("X-Sentra-Route-Id", routeId);
@@ -203,6 +220,12 @@ public class GatewayPolicyGlobalFilter implements GlobalFilter, Ordered {
                     set(headers, "X-Sentra-Scopes", encodeHeaderList(identity.scopes()));
                     if (identity.apiKey() != null) {
                         headers.set("X-Sentra-Client-Id", identity.apiKey().clientId().toString());
+                        headers.set("X-Sentra-Key-Id", identity.apiKey().keyId().toString());
+                        if (signingRequired) {
+                            headers.set("X-Sentra-Signature-Verified", "true");
+                            headers.set("X-Sentra-Signature-Key-Id", identity.apiKey().keyId().toString());
+                            headers.set("X-Sentra-Nonce-Status", "accepted");
+                        }
                     }
                 })
                 .build();
