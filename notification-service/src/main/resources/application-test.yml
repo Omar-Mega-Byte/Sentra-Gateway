@@ -1,0 +1,15 @@
+sentra:
+  environment: test
+  repository:
+    seed-enabled: true
+  fault:
+    controls-enabled: true
+    max-delay-ms: 100
+  management:
+    openapi-enabled: true
+    swagger-ui-enabled: true
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

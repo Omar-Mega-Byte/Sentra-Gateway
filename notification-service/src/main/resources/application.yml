@@ -1,0 +1,96 @@
+spring:
+  application:
+    name: ${SERVICE_NAME:notification-service}
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: true
+    time-zone: UTC
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
+
+server:
+  port: ${SERVER_PORT:8084}
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  server:
+    port: ${MANAGEMENT_PORT:${SERVER_PORT:8084}}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,notificationRepository
+  metrics:
+    tags:
+      application: ${SERVICE_NAME:notification-service}
+
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_UI_ENABLED:false}
+    path: /swagger-ui.html
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+
+sentra:
+  service-name: ${SERVICE_NAME:notification-service}
+  environment: ${SENTRA_ENVIRONMENT:${spring.profiles.active:}}
+  instance-id: ${SENTRA_INSTANCE_ID:${random.uuid}}
+  shutdown-timeout: ${SHUTDOWN_TIMEOUT:20s}
+  repository:
+    mode: ${NOTIFICATION_REPOSITORY_MODE:memory}
+    seed-enabled: ${NOTIFICATION_SEED_ENABLED:false}
+    seed-dataset: ${NOTIFICATION_SEED_DATASET:default}
+  gateway:
+    context-required: ${GATEWAY_CONTEXT_REQUIRED:true}
+    allowed-route-ids: ${GATEWAY_ALLOWED_ROUTE_IDS:notifications-list,notification-preferences-update,admin-test-notification}
+    allowed-peers: ${GATEWAY_ALLOWED_PEERS:}
+    trusted-header-max-length: ${TRUSTED_HEADER_MAX_LENGTH:255}
+    request-id-max-length: ${REQUEST_ID_MAX_LENGTH:128}
+    subject-max-length: ${SUBJECT_MAX_LENGTH:255}
+    tenant-id-max-length: ${TENANT_ID_MAX_LENGTH:128}
+  limits:
+    max-request-body-bytes: ${MAX_REQUEST_BODY_BYTES:16384}
+    default-page-size: ${DEFAULT_PAGE_SIZE:20}
+    max-page-size: ${MAX_PAGE_SIZE:100}
+    max-page-number: ${MAX_PAGE_NUMBER:10000}
+    max-title-length: ${MAX_TITLE_LENGTH:120}
+    max-message-length: ${MAX_MESSAGE_LENGTH:1000}
+    max-recipient-reference-length: ${MAX_RECIPIENT_REFERENCE_LENGTH:128}
+    max-error-details: ${MAX_ERROR_DETAILS:20}
+  fault:
+    controls-enabled: ${FAULT_CONTROLS_ENABLED:false}
+    allow-delay: ${FAULT_ALLOW_DELAY:true}
+    allow-status: ${FAULT_ALLOW_STATUS:true}
+    allow-malformed: ${FAULT_ALLOW_MALFORMED:true}
+    allow-disconnect: ${FAULT_ALLOW_DISCONNECT:true}
+    max-delay-ms: ${FAULT_MAX_DELAY_MS:5000}
+    allowed-statuses: ${FAULT_ALLOWED_STATUSES:500,502,503,504}
+    fail-once-cache-size: ${FAULT_FAIL_ONCE_CACHE_SIZE:1000}
+  management:
+    allowed-cidrs: ${MANAGEMENT_ALLOWED_CIDRS:}
+    metrics-enabled: ${METRICS_ENABLED:true}
+    openapi-enabled: ${OPENAPI_ENABLED:false}
+    swagger-ui-enabled: ${SWAGGER_UI_ENABLED:false}
+  logging:
+    root-level: ${LOG_LEVEL_ROOT:INFO}
+    format: ${LOG_FORMAT:text}
+    include-notification-ids: ${LOG_INCLUDE_NOTIFICATION_IDS:false}
+    include-owner-references: ${LOG_INCLUDE_OWNER_REFERENCES:false}

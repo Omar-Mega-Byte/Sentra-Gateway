@@ -1,0 +1,14 @@
+sentra:
+  environment: local
+  repository:
+    seed-enabled: true
+  fault:
+    controls-enabled: true
+  management:
+    openapi-enabled: true
+    swagger-ui-enabled: true
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
