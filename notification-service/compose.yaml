@@ -1,0 +1,33 @@
+name: sentra-notification
+
+services:
+  notification-service:
+    image: ${NOTIFICATION_IMAGE:-localhost/sentra/notification-service:1.0.0}
+    build:
+      context: .
+      dockerfile: Containerfile
+    env_file:
+      - .env
+    expose:
+      - "8084"
+    networks:
+      - services
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    user: "10084:10084"
+    stop_grace_period: ${SHUTDOWN_TIMEOUT:-20s}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${SERVER_PORT:-8084}/actuator/health/readiness >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+
+networks:
+  services:
+    name: ${SENTRA_SERVICES_NETWORK:-sentra-gateway_services}
+    external: true

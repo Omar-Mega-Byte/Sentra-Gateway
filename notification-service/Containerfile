@@ -1,0 +1,33 @@
+FROM docker.io/library/maven:3.9.16-eclipse-temurin-25-noble AS build
+
+WORKDIR /workspace
+COPY .mvn .mvn
+COPY mvnw mvnw
+COPY mvnw.cmd mvnw.cmd
+COPY pom.xml pom.xml
+COPY src src
+RUN ./mvnw -B -ntp clean package -DskipTests
+
+FROM docker.io/library/eclipse-temurin:25-jre
+
+ARG APP_UID=10084
+ARG APP_GID=10084
+
+RUN groupadd --gid "${APP_GID}" sentra \
+    && useradd --uid "${APP_UID}" --gid "${APP_GID}" --home-dir /app --shell /usr/sbin/nologin sentra \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=build --chown=${APP_UID}:${APP_GID} /workspace/target/notification-service-1.0.0-SNAPSHOT.jar /app/notification-service.jar
+
+USER ${APP_UID}:${APP_GID}
+EXPOSE 8084
+
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/urandom -Djava.io.tmpdir=/tmp"
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=6 \
+  CMD curl -fsS http://127.0.0.1:${SERVER_PORT:-8084}/actuator/health/readiness >/dev/null || exit 1
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/notification-service.jar"]
