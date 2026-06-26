@@ -1,0 +1,253 @@
+{
+  "info": {
+    "_postman_id": "7ea9de34-0fb3-4c4b-bd62-8a50fd946d8b",
+    "name": "Sentra Notification Service",
+    "description": "Direct local trusted-header checks for the internal notification-service API. External JWT, retry, timeout, circuit, and fallback behavior are owned by gateway-service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Readiness",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/actuator/health/readiness"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('readiness is UP', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('UP');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "OpenAPI Contains Internal Paths",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/v3/api-docs"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('OpenAPI exposes all notification operations', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const text = pm.response.text();",
+              "  pm.expect(text).to.include('/internal/v1/notifications');",
+              "  pm.expect(text).to.include('/internal/v1/preferences');",
+              "  pm.expect(text).to.include('/internal/v1/test');",
+              "  pm.expect(text).to.include('X-Sentra-Request-Id');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Owned Notifications",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "X-Sentra-Request-Id", "value": "{{requestId}}-list" },
+          { "key": "X-Sentra-Subject", "value": "{{subject}}" },
+          { "key": "X-Sentra-Actor-Type", "value": "USER" },
+          { "key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}" },
+          { "key": "X-Sentra-Scopes", "value": "notifications:read" },
+          { "key": "X-Sentra-Route-Id", "value": "notifications-list" }
+        ],
+        "url": "{{baseUrl}}/internal/v1/notifications?page=0&size=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('owned notification list succeeds and is scoped', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.totalElements).to.eql(2);",
+              "  pm.expect(JSON.stringify(body)).to.not.include('sentra-user-omar');",
+              "  pm.expect(JSON.stringify(body)).to.not.include('tenant-demo');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Missing Trusted Context",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/internal/v1/notifications"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('missing context is rejected', function () {",
+              "  pm.response.to.have.status(401);",
+              "  pm.expect(pm.response.json().code).to.eql('NTF_TRUSTED_CONTEXT_REQUIRED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update Preferences",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Sentra-Request-Id", "value": "{{requestId}}-preferences" },
+          { "key": "X-Sentra-Subject", "value": "{{preferenceSubject}}" },
+          { "key": "X-Sentra-Actor-Type", "value": "USER" },
+          { "key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}" },
+          { "key": "X-Sentra-Scopes", "value": "notifications:write" },
+          { "key": "X-Sentra-Route-Id", "value": "notification-preferences-update" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"emailEnabled\": true,\n  \"smsEnabled\": false,\n  \"pushEnabled\": true,\n  \"webhookEnabled\": false,\n  \"version\": 0\n}"
+        },
+        "url": "{{baseUrl}}/internal/v1/preferences"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.environment.set('preferenceSubject', 'sentra-postman-' + pm.variables.replaceIn('{{$guid}}'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('preference update succeeds with next version', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().version).to.eql(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stale Preference Version",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Sentra-Request-Id", "value": "{{requestId}}-preferences-stale" },
+          { "key": "X-Sentra-Subject", "value": "{{preferenceSubject}}" },
+          { "key": "X-Sentra-Actor-Type", "value": "USER" },
+          { "key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}" },
+          { "key": "X-Sentra-Scopes", "value": "notifications:write" },
+          { "key": "X-Sentra-Route-Id", "value": "notification-preferences-update" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"emailEnabled\": true,\n  \"smsEnabled\": false,\n  \"pushEnabled\": true,\n  \"webhookEnabled\": false,\n  \"version\": 0\n}"
+        },
+        "url": "{{baseUrl}}/internal/v1/preferences"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('stale version returns conflict', function () {",
+              "  pm.response.to.have.status(409);",
+              "  pm.expect(pm.response.json().code).to.eql('NTF_VERSION_CONFLICT');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Test Success",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Sentra-Request-Id", "value": "{{requestId}}-admin" },
+          { "key": "X-Sentra-Subject", "value": "{{adminSubject}}" },
+          { "key": "X-Sentra-Actor-Type", "value": "USER" },
+          { "key": "X-Sentra-Roles", "value": "NOTIFICATION_ADMIN" },
+          { "key": "X-Sentra-Route-Id", "value": "admin-test-notification" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"scenario\": \"SUCCESS\",\n  \"channel\": \"EMAIL\",\n  \"recipientReference\": \"test-recipient\",\n  \"message\": \"Gateway resilience smoke test\"\n}"
+        },
+        "url": "{{baseUrl}}/internal/v1/test"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('admin success accepted', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().result).to.eql('TEST_ACCEPTED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Test Failure",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Sentra-Request-Id", "value": "{{requestId}}-admin-failure" },
+          { "key": "X-Sentra-Subject", "value": "{{adminSubject}}" },
+          { "key": "X-Sentra-Actor-Type", "value": "USER" },
+          { "key": "X-Sentra-Roles", "value": "NOTIFICATION_ADMIN" },
+          { "key": "X-Sentra-Route-Id", "value": "admin-test-notification" },
+          { "key": "X-Sentra-Test-Status", "value": "503" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"scenario\": \"FAILURE\",\n  \"channel\": \"EMAIL\",\n  \"recipientReference\": \"test-recipient\",\n  \"message\": \"Gateway resilience smoke test\"\n}"
+        },
+        "url": "{{baseUrl}}/internal/v1/test"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('admin failure is controlled', function () {",
+              "  pm.response.to.have.status(503);",
+              "  pm.expect(pm.response.json().code).to.eql('NTF_TEST_FAILURE');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
