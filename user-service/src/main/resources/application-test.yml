@@ -1,0 +1,23 @@
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+sentra:
+  user:
+    environment: test
+    instance-id: user-service-test
+    repository:
+      seed-enabled: true
+    gateway:
+      context-required: true
+      allowed-peers: []
+    management:
+      openapi-enabled: true
+      swagger-ui-enabled: true

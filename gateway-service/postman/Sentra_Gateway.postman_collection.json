@@ -1,0 +1,306 @@
+{
+  "info": {
+    "_postman_id": "0ceea4ae-c1c0-4c39-93f0-2e572b1fd256",
+    "name": "Sentra Gateway",
+    "description": "Executable local smoke and administration workflow for gateway-service. Run in collection order with the Sentra Gateway Local environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {"key": "username", "value": "{{adminUsername}}", "type": "string"},
+      {"key": "password", "value": "{{adminPassword}}", "type": "string"}
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('runId')) {",
+          "  const runId = Date.now().toString();",
+          "  pm.collectionVariables.set('runId', runId);",
+          "  pm.collectionVariables.set('routeId', 'postman-route-' + runId);",
+          "  pm.collectionVariables.set('clientName', 'postman-client-' + runId);",
+          "  pm.collectionVariables.set('rateId', 'postman-rate-' + runId);",
+          "  pm.collectionVariables.set('ipId', 'postman-ip-' + runId);",
+          "  pm.collectionVariables.set('riskId', 'postman-risk-' + runId);",
+          "}",
+          "pm.collectionVariables.set('expiresAt', new Date(Date.now() + 3600000).toISOString());",
+          "pm.collectionVariables.set('auditFrom', new Date(Date.now() - 3600000).toISOString());",
+          "pm.collectionVariables.set('auditTo', new Date(Date.now() + 60000).toISOString());"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {"key": "runId", "value": ""},
+    {"key": "routeId", "value": ""},
+    {"key": "routeVersion", "value": "0"},
+    {"key": "clientName", "value": ""},
+    {"key": "clientId", "value": ""},
+    {"key": "keyId", "value": ""},
+    {"key": "rotatedKeyId", "value": ""},
+    {"key": "apiKey", "value": ""},
+    {"key": "rateId", "value": ""},
+    {"key": "ipId", "value": ""},
+    {"key": "riskId", "value": ""},
+    {"key": "expiresAt", "value": ""},
+    {"key": "auditFrom", "value": ""},
+    {"key": "auditTo", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "Health and OpenAPI",
+      "item": [
+        {
+          "name": "Readiness",
+          "request": {
+            "auth": {"type": "noauth"},
+            "method": "GET",
+            "url": "{{baseUrl}}/actuator/health/readiness"
+          },
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('readiness is UP', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().status).to.eql('UP'); });"
+          ]}}]
+        },
+        {
+          "name": "OpenAPI document",
+          "request": {
+            "auth": {"type": "noauth"},
+            "method": "GET",
+            "url": "{{baseUrl}}/v3/api-docs"
+          },
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('OpenAPI exposes admin APIs', () => {",
+            "  pm.response.to.have.status(200);",
+            "  const json = pm.response.json();",
+            "  pm.expect(json.info.title).to.eql('Sentra Gateway Administration API');",
+            "  pm.expect(json.paths).to.have.property('/api/v1/admin/routes');",
+            "  pm.expect(json.paths).to.have.property('/api/v1/admin/api-clients');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Admin API requires authentication",
+          "request": {
+            "auth": {"type": "noauth"},
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/admin/routes"
+          },
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('unauthenticated admin request is rejected', () => pm.response.to.have.status(401));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Routes",
+      "item": [
+        {
+          "name": "Validate route",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"id\": \"{{routeId}}\",\n  \"category\": \"USER\",\n  \"pathPatterns\": [\"/api/v1/postman/orders\"],\n  \"methods\": [\"GET\"],\n  \"targetUri\": \"http://order-service:8082\",\n  \"stripPrefix\": 0,\n  \"order\": 100,\n  \"enabled\": true,\n  \"authentication\": [\"JWT\"],\n  \"requiredRoles\": [],\n  \"requiredScopes\": [\"orders:read\"],\n  \"signingRequired\": false,\n  \"rateLimitPolicyId\": null,\n  \"ipPolicyId\": null,\n  \"riskPolicyId\": null,\n  \"connectTimeoutMs\": 1000,\n  \"responseTimeoutMs\": 3000,\n  \"retryPolicy\": {\"enabled\": true, \"maxAttempts\": 2, \"eligibleMethods\": [\"GET\"]},\n  \"circuitBreaker\": {\"enabled\": true, \"name\": \"postman-orders\"},\n  \"auditMode\": \"DENIALS_AND_MUTATIONS\",\n  \"version\": 0\n}"},
+            "url": "{{baseUrl}}/api/v1/admin/routes/validate"
+          },
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('route is valid', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().valid).to.be.true; });"
+          ]}}]
+        },
+        {
+          "name": "Create route",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"id\": \"{{routeId}}\",\n  \"category\": \"USER\",\n  \"pathPatterns\": [\"/api/v1/postman/orders\"],\n  \"methods\": [\"GET\"],\n  \"targetUri\": \"http://order-service:8082\",\n  \"stripPrefix\": 0,\n  \"order\": 100,\n  \"enabled\": true,\n  \"authentication\": [\"JWT\"],\n  \"requiredRoles\": [],\n  \"requiredScopes\": [\"orders:read\"],\n  \"signingRequired\": false,\n  \"rateLimitPolicyId\": null,\n  \"ipPolicyId\": null,\n  \"riskPolicyId\": null,\n  \"connectTimeoutMs\": 1000,\n  \"responseTimeoutMs\": 3000,\n  \"retryPolicy\": {\"enabled\": true, \"maxAttempts\": 2, \"eligibleMethods\": [\"GET\"]},\n  \"circuitBreaker\": {\"enabled\": true, \"name\": \"postman-orders\"},\n  \"auditMode\": \"DENIALS_AND_MUTATIONS\",\n  \"version\": 0\n}"},
+            "url": "{{baseUrl}}/api/v1/admin/routes"
+          },
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('route created', () => pm.response.to.have.status(201));",
+            "const json = pm.response.json(); pm.collectionVariables.set('routeVersion', json.version);"
+          ]}}]
+        },
+        {
+          "name": "Get route",
+          "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/admin/routes/{{routeId}}"},
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('route can be read', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('routeId')); });"
+          ]}}]
+        },
+        {
+          "name": "Update route",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"id\": \"{{routeId}}\",\n  \"category\": \"USER\",\n  \"pathPatterns\": [\"/api/v1/postman/orders\"],\n  \"methods\": [\"GET\"],\n  \"targetUri\": \"http://order-service:8082\",\n  \"stripPrefix\": 0,\n  \"order\": 100,\n  \"enabled\": false,\n  \"authentication\": [\"JWT\"],\n  \"requiredRoles\": [],\n  \"requiredScopes\": [\"orders:read\"],\n  \"signingRequired\": false,\n  \"rateLimitPolicyId\": null,\n  \"ipPolicyId\": null,\n  \"riskPolicyId\": null,\n  \"connectTimeoutMs\": 1000,\n  \"responseTimeoutMs\": 3000,\n  \"retryPolicy\": {\"enabled\": true, \"maxAttempts\": 2, \"eligibleMethods\": [\"GET\"]},\n  \"circuitBreaker\": {\"enabled\": true, \"name\": \"postman-orders\"},\n  \"auditMode\": \"DENIALS_AND_MUTATIONS\",\n  \"version\": {{routeVersion}}\n}"},
+            "url": "{{baseUrl}}/api/v1/admin/routes/{{routeId}}"
+          },
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('route updated with optimistic version', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().enabled).to.be.false; });",
+            "pm.collectionVariables.set('routeVersion', pm.response.json().version);"
+          ]}}]
+        },
+        {
+          "name": "Enable route",
+          "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/admin/routes/{{routeId}}/enable"},
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('route enabled', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().enabled).to.be.true; });"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "API Clients and Keys",
+      "item": [
+        {
+          "name": "Create API client",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"name\":\"{{clientName}}\",\"owner\":\"postman\",\"tenantId\":\"tenant-postman\"}"},
+            "url": "{{baseUrl}}/api/v1/admin/api-clients"
+          },
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('API client created', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('clientId', pm.response.json().id);"
+          ]}}]
+        },
+        {
+          "name": "Issue API key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Idempotency-Key", "value": "issue-{{$guid}}"}
+            ],
+            "body": {"mode": "raw", "raw": "{\"scopes\":[\"payments:write\"],\"allowedRoutes\":[\"payment-create\"],\"expiresAt\":\"{{expiresAt}}\"}"},
+            "url": "{{baseUrl}}/api/v1/admin/api-clients/{{clientId}}/keys"
+          },
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('plaintext key is returned once', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().apiKey).to.match(/^sgw_local_/); });",
+            "const json = pm.response.json(); pm.collectionVariables.set('keyId', json.keyId); pm.collectionVariables.set('apiKey', json.apiKey);"
+          ]}}]
+        },
+        {
+          "name": "List key metadata",
+          "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/admin/api-clients/{{clientId}}/keys"},
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('metadata excludes secrets and verifiers', () => {",
+            "  pm.response.to.have.status(200);",
+            "  const key = pm.response.json()[0];",
+            "  pm.expect(key).not.to.have.property('apiKey');",
+            "  pm.expect(key).not.to.have.property('verifier');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Rotate API key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Idempotency-Key", "value": "rotate-{{$guid}}"}
+            ],
+            "body": {"mode": "raw", "raw": "{\"expiresAt\":\"{{expiresAt}}\"}"},
+            "url": "{{baseUrl}}/api/v1/admin/api-keys/{{keyId}}/rotate"
+          },
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('successor key issued', () => { pm.response.to.have.status(201); pm.expect(pm.response.json().keyId).not.to.eql(pm.collectionVariables.get('keyId')); });",
+            "pm.collectionVariables.set('rotatedKeyId', pm.response.json().keyId);"
+          ]}}]
+        },
+        {
+          "name": "Revoke successor key",
+          "request": {"method": "POST", "url": "{{baseUrl}}/api/v1/admin/api-keys/{{rotatedKeyId}}/revoke"},
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('key revoked', () => pm.response.to.have.status(204));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Security Policies",
+      "item": [
+        {
+          "name": "Create rate limit",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"id\":\"{{rateId}}\",\"subjectType\":\"CLIENT\",\"routeId\":\"payment-create\",\"method\":\"POST\",\"capacity\":10,\"refillTokens\":10,\"refillPeriodSeconds\":60,\"priority\":100,\"redisOutageMode\":\"DENY\",\"responseHeadersEnabled\":true,\"enabled\":true,\"version\":0}"},
+            "url": "{{baseUrl}}/api/v1/admin/rate-limits"
+          },
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('rate policy created', () => pm.response.to.have.status(201));"]}}]
+        },
+        {
+          "name": "Create IP rule",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"id\":\"{{ipId}}\",\"network\":\"203.0.113.0/24\",\"action\":\"BLOCK\",\"routeId\":\"payment-create\",\"priority\":100,\"reason\":\"Postman verification\",\"validFrom\":\"{{auditFrom}}\",\"expiresAt\":\"{{expiresAt}}\",\"enabled\":true,\"version\":0}"},
+            "url": "{{baseUrl}}/api/v1/admin/ip-rules"
+          },
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('IP rule created', () => pm.response.to.have.status(201));"]}}]
+        },
+        {
+          "name": "Create risk rule",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"id\":\"{{riskId}}\",\"signal\":\"HEADER_COUNT\",\"thresholdValue\":50,\"weight\":25,\"action\":\"OBSERVE\",\"routeId\":\"payment-create\",\"enabled\":true,\"version\":0}"},
+            "url": "{{baseUrl}}/api/v1/admin/risk-rules"
+          },
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('risk rule created', () => pm.response.to.have.status(201));"]}}]
+        },
+        {
+          "name": "List policies",
+          "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/admin/rate-limits"},
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('policy collection is readable', () => { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); });"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Audit and Cleanup",
+      "item": [
+        {
+          "name": "Search audit events",
+          "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/admin/audit-events?from={{auditFrom}}&to={{auditTo}}&pageSize=100"},
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('bounded audit search succeeds', () => { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); });"
+          ]}}]
+        },
+        {
+          "name": "List admin actions",
+          "request": {"method": "GET", "url": "{{baseUrl}}/api/v1/admin/admin-actions?page=0&pageSize=100"},
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('admin actions were recorded', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().length).to.be.above(0); });"
+          ]}}]
+        },
+        {
+          "name": "Delete rate limit",
+          "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/admin/rate-limits/{{rateId}}"},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('rate policy deleted', () => pm.response.to.have.status(204));"]}}]
+        },
+        {
+          "name": "Delete IP rule",
+          "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/admin/ip-rules/{{ipId}}"},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('IP rule deleted', () => pm.response.to.have.status(204));"]}}]
+        },
+        {
+          "name": "Delete risk rule",
+          "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/admin/risk-rules/{{riskId}}"},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('risk rule deleted', () => pm.response.to.have.status(204));"]}}]
+        },
+        {
+          "name": "Delete route",
+          "request": {"method": "DELETE", "url": "{{baseUrl}}/api/v1/admin/routes/{{routeId}}"},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('route deleted', () => pm.response.to.have.status(204));"]}}]
+        }
+      ]
+    }
+  ]
+}

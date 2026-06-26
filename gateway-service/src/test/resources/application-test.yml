@@ -1,0 +1,41 @@
+spring:
+  flyway:
+    enabled: false
+  r2dbc:
+    url: r2dbc:h2:mem:///sentra;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password:
+  data:
+    redis:
+      repositories:
+        enabled: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-test.sql
+
+sentra:
+  environment: test
+  security:
+    local-auth-enabled: true
+    api-key-pepper: test-pepper-that-is-at-least-thirty-two-bytes
+    local-users:
+      admin:
+        username: admin
+        password: password
+      operator:
+        username: operator
+        password: password
+  routing:
+    allowed-service-hosts: localhost,user-service,order-service,payment-service,notification-service
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+debug: false
+logging:
+  level:
+    root: WARN
+    com.omar.sentra.gateway: INFO

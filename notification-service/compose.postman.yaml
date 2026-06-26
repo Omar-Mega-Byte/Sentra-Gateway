@@ -1,0 +1,13 @@
+services:
+  notification-service:
+    ports:
+      - "127.0.0.1:${SERVER_PORT:-8084}:8084"
+    networks:
+      - services
+      - notification-local
+
+networks:
+  notification-local:
+    name: sentra-notification_local
+    driver: bridge
+    internal: false

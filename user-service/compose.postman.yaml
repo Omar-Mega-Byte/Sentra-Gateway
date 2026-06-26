@@ -1,0 +1,12 @@
+services:
+  user-service:
+    ports:
+      - "127.0.0.1:${SERVER_PORT:-8081}:8081"
+    networks:
+      - services
+      - operations
+      - postman
+
+networks:
+  postman:
+    driver: bridge
