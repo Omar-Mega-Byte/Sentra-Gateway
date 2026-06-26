@@ -1,0 +1,18 @@
+sentra:
+  environment: prod
+  repository:
+    seed-enabled: false
+  fault:
+    controls-enabled: false
+    allow-delay: false
+    allow-status: false
+    allow-malformed: false
+    allow-disconnect: false
+  management:
+    openapi-enabled: false
+    swagger-ui-enabled: false
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
