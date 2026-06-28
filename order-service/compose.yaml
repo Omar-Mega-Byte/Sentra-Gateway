@@ -1,0 +1,34 @@
+name: sentra-order
+
+services:
+  order-service:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: ${ORDER_IMAGE:-localhost/sentra/order-service:1.0.0}
+    env_file: .env
+    expose:
+      - "8082"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8082/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 12
+    networks:
+      - services
+      - operations
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+
+networks:
+  services:
+    external: true
+    name: ${SENTRA_SERVICES_NETWORK:-sentra-gateway_services}
+  operations:
+    name: sentra-order-operations
+    internal: true
