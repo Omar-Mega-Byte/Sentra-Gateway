@@ -1,0 +1,596 @@
+{
+  "info": {
+    "_postman_id": "d451e880-e729-4cf8-8ea5-b06e35e97373",
+    "name": "Sentra Order Service",
+    "description": "Direct local verification of the internal order-service contract. These X-Sentra-* headers simulate values created by Sentra Gateway and must never be accepted from public traffic.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Readiness is UP",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/actuator/health/readiness"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('readiness is UP', () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('UP');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "OpenAPI contains all operations",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/v3/api-docs"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('all four operations are documented', () => {",
+              "  pm.response.to.have.status(200);",
+              "  const api = pm.response.json();",
+              "  pm.expect(api.paths['/internal/v1/orders'].get).to.exist;",
+              "  pm.expect(api.paths['/internal/v1/orders'].post).to.exist;",
+              "  pm.expect(api.paths['/internal/v1/orders/{id}'].get).to.exist;",
+              "  pm.expect(api.paths['/internal/v1/admin/orders'].get).to.exist;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List owned orders",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "postman-list-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:read"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-list"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/orders?page=0&size=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('only the trusted owner partition is returned', () => {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.totalElements).to.eql(2);",
+              "  pm.expect(body.items).to.have.length(2);",
+              "  body.items.forEach(order => {",
+              "    pm.expect(order).not.to.have.property('ownerSubject');",
+              "    pm.expect(order).not.to.have.property('tenantId');",
+              "  });",
+              "  pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get owned order",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "postman-get-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:read"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-get"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/orders/{{ownedOrderId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('owned order is returned safely', () => {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.eql(pm.environment.get('ownedOrderId'));",
+              "  pm.expect(body).not.to.have.property('ownerSubject');",
+              "  pm.expect(body).not.to.have.property('tenantId');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Foreign subject is hidden",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "postman-foreign-subject-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:read"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-get"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/orders/{{foreignSubjectOrderId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('foreign subject is indistinguishable from unknown', () => {",
+              "  pm.response.to.have.status(404);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_ORDER_NOT_FOUND');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Foreign tenant is hidden",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "postman-foreign-tenant-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:read"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-get"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/orders/{{foreignTenantOrderId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('foreign tenant is indistinguishable from unknown', () => {",
+              "  pm.response.to.have.status(404);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_ORDER_NOT_FOUND');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Missing trusted context is denied",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/internal/v1/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('missing context returns stable 401', () => {",
+              "  pm.response.to.have.status(401);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_TRUSTED_CONTEXT_REQUIRED');",
+              "  pm.expect(pm.response.headers.get('X-Request-Id')).to.exist;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wrong actor is denied",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "postman-actor-deny-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:read"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-list"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('wrong actor returns stable 403', () => {",
+              "  pm.response.to.have.status(403);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_ACTOR_NOT_ALLOWED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Missing scope is denied",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "postman-scope-deny-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "profile:read"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-list"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('missing scope returns stable 403', () => {",
+              "  pm.response.to.have.status(403);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_SCOPE_REQUIRED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wrong route is denied",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "postman-route-deny-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:read"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-get"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('wrong route returns stable 403', () => {",
+              "  pm.response.to.have.status(403);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_ROUTE_NOT_ALLOWED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create keyed order",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "X-Sentra-Request-Id", "value": "postman-create-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:write"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-create"},
+          {"key": "Idempotency-Key", "value": "{{idempotencyKey}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"items\":[{\"sku\":\"BOOK-JAVA-25\",\"quantity\":1}]}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "url": "{{baseUrl}}/internal/v1/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('create returns a server-controlled order', () => {",
+              "  pm.response.to.have.status(201);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('CREATED');",
+              "  pm.expect(body).not.to.have.property('ownerSubject');",
+              "  pm.expect(pm.response.headers.get('Location')).to.include(body.id);",
+              "  pm.expect(pm.response.headers.get('Idempotency-Replayed')).to.eql('false');",
+              "  pm.environment.set('createdOrderBody', pm.response.text());",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Replay keyed order",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "X-Sentra-Request-Id", "value": "postman-create-replay-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:write"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-create"},
+          {"key": "Idempotency-Key", "value": "{{idempotencyKey}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"items\":[{\"quantity\":1,\"sku\":\"BOOK-JAVA-25\"}]}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "url": "{{baseUrl}}/internal/v1/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('same key and payload replays the original result', () => {",
+              "  pm.response.to.have.status(201);",
+              "  pm.expect(pm.response.headers.get('Idempotency-Replayed')).to.eql('true');",
+              "  pm.expect(pm.response.text()).to.eql(pm.environment.get('createdOrderBody'));",
+              "  pm.expect(pm.response.headers.get('X-Request-Id')).to.eql('postman-create-replay-001');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Idempotency payload conflict",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "X-Sentra-Request-Id", "value": "postman-create-conflict-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:write"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-create"},
+          {"key": "Idempotency-Key", "value": "{{idempotencyKey}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"items\":[{\"sku\":\"BOOK-JAVA-25\",\"quantity\":2}]}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "url": "{{baseUrl}}/internal/v1/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('changed payload returns conflict', () => {",
+              "  pm.response.to.have.status(409);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_IDEMPOTENCY_CONFLICT');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Unknown create field is rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "X-Sentra-Request-Id", "value": "postman-unknown-field-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:write"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-create"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"ownerSubject\":\"attacker\",\"items\":[{\"sku\":\"BOOK-JAVA-25\",\"quantity\":1}]}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "url": "{{baseUrl}}/internal/v1/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('server-controlled input is rejected', () => {",
+              "  pm.response.to.have.status(400);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_REQUEST_INVALID');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Duplicate SKU is rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "X-Sentra-Request-Id", "value": "postman-duplicate-sku-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:write"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-create"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"items\":[{\"sku\":\"DUPLICATE-SKU\",\"quantity\":1},{\"sku\":\"DUPLICATE-SKU\",\"quantity\":2}]}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "url": "{{baseUrl}}/internal/v1/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('duplicate SKU returns stable validation error', () => {",
+              "  pm.response.to.have.status(400);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_REQUEST_INVALID');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Malformed JSON is rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "X-Sentra-Request-Id", "value": "postman-malformed-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:write"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-create"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"items\":[{\"sku\":\"BOOK-JAVA-25\",\"quantity\":",
+          "options": {"raw": {"language": "json"}}
+        },
+        "url": "{{baseUrl}}/internal/v1/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('malformed JSON returns stable validation error', () => {",
+              "  pm.response.to.have.status(400);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_REQUEST_INVALID');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Oversized body is rejected",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.variables.set('oversizedBody', JSON.stringify({items: [{sku: 'X'.repeat(33000), quantity: 1}]}));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('oversized body is rejected before domain work', () => {",
+              "  pm.response.to.have.status(413);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_BODY_TOO_LARGE');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "X-Sentra-Request-Id", "value": "postman-oversized-001"},
+          {"key": "X-Sentra-Subject", "value": "{{subject}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Tenant-Id", "value": "{{tenantId}}"},
+          {"key": "X-Sentra-Scopes", "value": "orders:write"},
+          {"key": "X-Sentra-Route-Id", "value": "orders-create"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{{oversizedBody}}",
+          "options": {"raw": {"language": "json"}}
+        },
+        "url": "{{baseUrl}}/internal/v1/orders"
+      }
+    },
+    {
+      "name": "Admin without role is denied",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "postman-admin-deny-001"},
+          {"key": "X-Sentra-Subject", "value": "sentra-admin"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Route-Id", "value": "admin-orders-list"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/admin/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('missing admin role returns stable 403', () => {",
+              "  pm.response.to.have.status(403);",
+              "  pm.expect(pm.response.json().code).to.eql('ORD_ROLE_REQUIRED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin list includes owner references",
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "postman-admin-list-001"},
+          {"key": "X-Sentra-Subject", "value": "sentra-admin"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Roles", "value": "ORDER_ADMIN"},
+          {"key": "X-Sentra-Route-Id", "value": "admin-orders-list"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/admin/orders?page=0&size=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('authorized admin sees bounded owner references', () => {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.items.length).to.be.above(3);",
+              "  pm.expect(body.items[0]).to.have.property('ownerSubject');",
+              "  pm.expect(body.items[0]).to.have.property('tenantId');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
