@@ -1,0 +1,30 @@
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+spring:
+  flyway:
+    enabled: false
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+sentra:
+  order:
+    environment: test
+    instance-id: order-service-test
+    repository:
+      mode: memory
+      seed-enabled: true
+    gateway:
+      context-required: true
+      allowed-peers:
+        - 127.0.0.1/32
+        - ::1/128
+    management:
+      openapi-enabled: true
+      swagger-ui-enabled: true

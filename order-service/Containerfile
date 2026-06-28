@@ -1,0 +1,17 @@
+FROM docker.io/library/maven:3.9.12-eclipse-temurin-25 AS build
+WORKDIR /workspace
+COPY pom.xml .
+RUN mvn -B -ntp dependency:go-offline
+COPY src src
+RUN mvn -B -ntp clean verify
+
+FROM docker.io/library/eclipse-temurin:25-jre
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 --no-create-home sentra
+WORKDIR /app
+COPY --from=build /workspace/target/order-service-1.0.0-SNAPSHOT.jar /app/order-service.jar
+USER 10001
+EXPOSE 8082
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-Djava.io.tmpdir=/tmp", "-Djava.security.egd=file:/dev/urandom", "-jar", "/app/order-service.jar"]

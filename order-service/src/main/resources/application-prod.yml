@@ -1,0 +1,19 @@
+logging:
+  structured:
+    format:
+      console: logstash
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+sentra:
+  order:
+    repository:
+      mode: postgres
+      seed-enabled: false
+    management:
+      openapi-enabled: false
+      swagger-ui-enabled: false
