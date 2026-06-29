@@ -1,0 +1,546 @@
+{
+  "info": {
+    "_postman_id": "5871d53a-a2fc-42dd-b177-5837a0a74b9e",
+    "name": "Sentra Payment Service",
+    "description": "Direct local collection for payment-service internal APIs. These requests simulate trusted headers created by Sentra Gateway; partner API-key, HMAC, and replay validation must still be verified through gateway-service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Readiness is UP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('readiness is UP', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('UP');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/actuator/health/readiness"
+      }
+    },
+    {
+      "name": "OpenAPI contains payment operations",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('OpenAPI includes all internal payment paths', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.paths['/internal/v1/payments/{id}'].get).to.be.an('object');",
+              "  pm.expect(body.paths['/internal/v1/payments'].post).to.be.an('object');",
+              "  pm.expect(body.paths['/internal/v1/refunds'].post).to.be.an('object');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/v3/api-docs"
+      }
+    },
+    {
+      "name": "Read owned payment",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('owned payment is returned and redacted', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.eql(pm.environment.get('ownedPaymentId'));",
+              "  pm.expect(body.clientId).to.be.undefined;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "payments:read"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-payment-read"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/payments/{{ownedPaymentId}}"
+      }
+    },
+    {
+      "name": "Foreign payment returns safe 404",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('foreign payment is hidden', function () {",
+              "  pm.response.to.have.status(404);",
+              "  pm.expect(pm.response.json().code).to.eql('PAY_PAYMENT_NOT_FOUND');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "payments:read"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-payment-read"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/payments/{{foreignPaymentId}}"
+      }
+    },
+    {
+      "name": "Missing trusted context is rejected",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('missing trusted context returns 401', function () {",
+              "  pm.response.to.have.status(401);",
+              "  pm.expect(pm.response.json().code).to.eql('PAY_TRUSTED_CONTEXT_REQUIRED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/internal/v1/payments/{{ownedPaymentId}}"
+      }
+    },
+    {
+      "name": "Wrong actor is rejected",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('wrong actor returns 403', function () {",
+              "  pm.response.to.have.status(403);",
+              "  pm.expect(pm.response.json().code).to.eql('PAY_ACTOR_NOT_ALLOWED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "USER"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "payments:read"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-payment-read"}
+        ],
+        "url": "{{baseUrl}}/internal/v1/payments/{{ownedPaymentId}}"
+      }
+    },
+    {
+      "name": "Missing signature evidence is rejected",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('deniedRef', 'acme-order-denied-' + Date.now());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('missing signature evidence returns 403', function () {",
+              "  pm.response.to.have.status(403);",
+              "  pm.expect(pm.response.json().code).to.eql('PAY_SIGNATURE_CONTEXT_REQUIRED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Idempotency-Key", "value": "missing-signature-{{$timestamp}}"},
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "payments:write"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-payment-create"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"merchantReference\":\"{{deniedRef}}\",\"amount\":\"12.00\",\"currency\":\"USD\"}"
+        },
+        "url": "{{baseUrl}}/internal/v1/payments"
+      }
+    },
+    {
+      "name": "Create payment",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const runId = Date.now() + '-' + Math.floor(Math.random() * 100000);",
+              "pm.collectionVariables.set('paymentRef', 'acme-order-postman-' + runId);",
+              "pm.collectionVariables.set('paymentKey', 'postman-payment-key-' + runId);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('payment create succeeds', function () {",
+              "  pm.response.to.have.status(201);",
+              "  pm.expect(pm.response.headers.get('Idempotency-Replayed')).to.eql('false');",
+              "  pm.expect(pm.response.json().status).to.eql('AUTHORIZED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Idempotency-Key", "value": "{{paymentKey}}"},
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "payments:write"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-payment-create"},
+          {"key": "X-Sentra-Signature-Verified", "value": "true"},
+          {"key": "X-Sentra-Signature-Key-Id", "value": "{{signatureKeyId}}"},
+          {"key": "X-Sentra-Nonce-Status", "value": "accepted"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"merchantReference\":\"{{paymentRef}}\",\"amount\":\"125.50\",\"currency\":\"USD\",\"description\":\"Postman payment-service smoke\"}"
+        },
+        "url": "{{baseUrl}}/internal/v1/payments"
+      }
+    },
+    {
+      "name": "Replay payment idempotency",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('payment replay succeeds', function () {",
+              "  pm.response.to.have.status(201);",
+              "  pm.expect(pm.response.headers.get('Idempotency-Replayed')).to.eql('true');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Idempotency-Key", "value": "{{paymentKey}}"},
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "payments:write"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-payment-create"},
+          {"key": "X-Sentra-Signature-Verified", "value": "true"},
+          {"key": "X-Sentra-Signature-Key-Id", "value": "{{signatureKeyId}}"},
+          {"key": "X-Sentra-Nonce-Status", "value": "accepted"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"currency\":\"USD\",\"amount\":\"125.50\",\"merchantReference\":\"{{paymentRef}}\",\"description\":\"Postman payment-service smoke\"}"
+        },
+        "url": "{{baseUrl}}/internal/v1/payments"
+      }
+    },
+    {
+      "name": "Payment idempotency conflict",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('payment conflict is stable', function () {",
+              "  pm.response.to.have.status(409);",
+              "  pm.expect(pm.response.json().code).to.eql('PAY_IDEMPOTENCY_CONFLICT');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Idempotency-Key", "value": "{{paymentKey}}"},
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "payments:write"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-payment-create"},
+          {"key": "X-Sentra-Signature-Verified", "value": "true"},
+          {"key": "X-Sentra-Signature-Key-Id", "value": "{{signatureKeyId}}"},
+          {"key": "X-Sentra-Nonce-Status", "value": "accepted"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"merchantReference\":\"{{paymentRef}}\",\"amount\":\"126.00\",\"currency\":\"USD\",\"description\":\"Postman payment-service smoke\"}"
+        },
+        "url": "{{baseUrl}}/internal/v1/payments"
+      }
+    },
+    {
+      "name": "Create refund",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const runId = Date.now() + '-' + Math.floor(Math.random() * 100000);",
+              "pm.collectionVariables.set('refundRef', 'acme-refund-postman-' + runId);",
+              "pm.collectionVariables.set('refundKey', 'postman-refund-key-' + runId);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('refund create succeeds', function () {",
+              "  pm.response.to.have.status(201);",
+              "  pm.expect(pm.response.headers.get('Idempotency-Replayed')).to.eql('false');",
+              "  pm.expect(pm.response.json().status).to.eql('ACCEPTED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Idempotency-Key", "value": "{{refundKey}}"},
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "refunds:write"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-refund-create"},
+          {"key": "X-Sentra-Signature-Verified", "value": "true"},
+          {"key": "X-Sentra-Signature-Key-Id", "value": "{{signatureKeyId}}"},
+          {"key": "X-Sentra-Nonce-Status", "value": "accepted"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentId\":\"{{ownedPaymentId}}\",\"merchantReference\":\"{{refundRef}}\",\"amount\":\"25.00\"}"
+        },
+        "url": "{{baseUrl}}/internal/v1/refunds"
+      }
+    },
+    {
+      "name": "Replay refund idempotency",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('refund replay succeeds', function () {",
+              "  pm.response.to.have.status(201);",
+              "  pm.expect(pm.response.headers.get('Idempotency-Replayed')).to.eql('true');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Idempotency-Key", "value": "{{refundKey}}"},
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "refunds:write"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-refund-create"},
+          {"key": "X-Sentra-Signature-Verified", "value": "true"},
+          {"key": "X-Sentra-Signature-Key-Id", "value": "{{signatureKeyId}}"},
+          {"key": "X-Sentra-Nonce-Status", "value": "accepted"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"paymentId\":\"{{ownedPaymentId}}\",\"merchantReference\":\"{{refundRef}}\",\"amount\":\"25.00\"}"
+        },
+        "url": "{{baseUrl}}/internal/v1/refunds"
+      }
+    },
+    {
+      "name": "Invalid amount is rejected",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('invalid amount returns 400', function () {",
+              "  pm.response.to.have.status(400);",
+              "  pm.expect(pm.response.json().code).to.eql('PAY_REQUEST_INVALID');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Idempotency-Key", "value": "invalid-amount-{{$timestamp}}"},
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "payments:write"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-payment-create"},
+          {"key": "X-Sentra-Signature-Verified", "value": "true"},
+          {"key": "X-Sentra-Signature-Key-Id", "value": "{{signatureKeyId}}"},
+          {"key": "X-Sentra-Nonce-Status", "value": "accepted"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"merchantReference\":\"acme-order-invalid-{{$timestamp}}\",\"amount\":\"1.234\",\"currency\":\"USD\"}"
+        },
+        "url": "{{baseUrl}}/internal/v1/payments"
+      }
+    },
+    {
+      "name": "Unsupported media type is rejected",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('unsupported media returns 415', function () {",
+              "  pm.response.to.have.status(415);",
+              "  pm.expect(pm.response.json().code).to.eql('PAY_MEDIA_TYPE_UNSUPPORTED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "text/plain"},
+          {"key": "Idempotency-Key", "value": "unsupported-media-{{$timestamp}}"},
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "payments:write"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-payment-create"},
+          {"key": "X-Sentra-Signature-Verified", "value": "true"},
+          {"key": "X-Sentra-Signature-Key-Id", "value": "{{signatureKeyId}}"},
+          {"key": "X-Sentra-Nonce-Status", "value": "accepted"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"merchantReference\":\"acme-order-media-{{$timestamp}}\",\"amount\":\"12.00\",\"currency\":\"USD\"}"
+        },
+        "url": "{{baseUrl}}/internal/v1/payments"
+      }
+    },
+    {
+      "name": "Oversized body is rejected",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('oversizedBody', JSON.stringify({merchantReference: 'X'.repeat(17000), amount: '12.00', currency: 'USD'}));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('oversized body returns 413', function () {",
+              "  pm.response.to.have.status(413);",
+              "  pm.expect(pm.response.json().code).to.eql('PAY_BODY_TOO_LARGE');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Idempotency-Key", "value": "oversized-body-{{$timestamp}}"},
+          {"key": "X-Sentra-Request-Id", "value": "{{requestId}}"},
+          {"key": "X-Sentra-Actor-Type", "value": "API_CLIENT"},
+          {"key": "X-Sentra-Client-Id", "value": "{{clientId}}"},
+          {"key": "X-Sentra-Key-Id", "value": "{{keyId}}"},
+          {"key": "X-Sentra-Scopes", "value": "payments:write"},
+          {"key": "X-Sentra-Route-Id", "value": "partner-payment-create"},
+          {"key": "X-Sentra-Signature-Verified", "value": "true"},
+          {"key": "X-Sentra-Signature-Key-Id", "value": "{{signatureKeyId}}"},
+          {"key": "X-Sentra-Nonce-Status", "value": "accepted"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{{oversizedBody}}"
+        },
+        "url": "{{baseUrl}}/internal/v1/payments"
+      }
+    }
+  ]
+}
