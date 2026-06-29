@@ -1,0 +1,12 @@
+services:
+  payment-service:
+    ports:
+      - "127.0.0.1:8083:8083"
+    environment:
+      GATEWAY_ALLOWED_PEERS: ""
+    networks:
+      - postman
+
+networks:
+  postman:
+    name: sentra-payment-postman
