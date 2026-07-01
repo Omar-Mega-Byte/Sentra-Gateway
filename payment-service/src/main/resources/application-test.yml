@@ -1,0 +1,26 @@
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+sentra:
+  payment:
+    environment: test
+    instance-id: payment-service-test
+    repository:
+      mode: memory
+      seed-enabled: true
+    gateway:
+      context-required: true
+      allowed-peers:
+        - 127.0.0.1/32
+        - ::1/128
+    management:
+      openapi-enabled: true
+      swagger-ui-enabled: true

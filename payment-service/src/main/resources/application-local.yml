@@ -1,0 +1,18 @@
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_UI_ENABLED:true}
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+sentra:
+  payment:
+    repository:
+      seed-enabled: ${PAYMENT_SEED_ENABLED:true}
+    management:
+      openapi-enabled: ${OPENAPI_ENABLED:true}
+      swagger-ui-enabled: ${SWAGGER_UI_ENABLED:true}

@@ -1,0 +1,15 @@
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+sentra:
+  payment:
+    repository:
+      seed-enabled: false
+    management:
+      openapi-enabled: false
+      swagger-ui-enabled: false
+    logging:
+      format: json
