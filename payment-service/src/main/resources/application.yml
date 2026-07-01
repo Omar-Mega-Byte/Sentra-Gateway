@@ -1,0 +1,106 @@
+spring:
+  application:
+    name: ${SERVICE_NAME:payment-service}
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+
+server:
+  port: ${SERVER_PORT:8083}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  server:
+    port: ${MANAGEMENT_PORT:${SERVER_PORT:8083}}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    enable:
+      all: ${METRICS_ENABLED:true}
+    tags:
+      application: ${SERVICE_NAME:payment-service}
+      environment: ${SENTRA_ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_ENABLED:false}
+    path: /v3/api-docs
+    version: openapi_3_1
+  swagger-ui:
+    enabled: ${SWAGGER_UI_ENABLED:false}
+    path: /swagger-ui.html
+    display-request-duration: true
+    operations-sorter: method
+    tags-sorter: alpha
+
+sentra:
+  payment:
+    environment: ${SENTRA_ENVIRONMENT:local}
+    instance-id: ${SENTRA_INSTANCE_ID:${random.uuid}}
+    service-name: ${SERVICE_NAME:payment-service}
+    shutdown-timeout: ${SHUTDOWN_TIMEOUT:20s}
+    repository:
+      mode: ${PAYMENT_REPOSITORY_MODE:memory}
+      seed-enabled: ${PAYMENT_SEED_ENABLED:false}
+      seed-dataset: ${PAYMENT_SEED_DATASET:default}
+      mock-decline-references: ${PAYMENT_MOCK_DECLINE_REFERENCES:}
+    gateway:
+      context-required: ${GATEWAY_CONTEXT_REQUIRED:true}
+      allowed-route-ids: ${GATEWAY_ALLOWED_ROUTE_IDS:partner-payment-read,partner-payment-create,partner-refund-create}
+      allowed-peers: ${GATEWAY_ALLOWED_PEERS:}
+      trusted-header-max-length: ${TRUSTED_HEADER_MAX_LENGTH:255}
+      request-id-max-length: ${REQUEST_ID_MAX_LENGTH:128}
+      client-id-max-length: ${CLIENT_ID_MAX_LENGTH:120}
+      key-id-max-length: ${KEY_ID_MAX_LENGTH:120}
+    signature:
+      evidence-required-for-mutations: ${SIGNATURE_EVIDENCE_REQUIRED_FOR_MUTATIONS:true}
+      verified-header: ${SIGNATURE_VERIFIED_HEADER:X-Sentra-Signature-Verified}
+      key-id-header: ${SIGNATURE_KEY_ID_HEADER:X-Sentra-Signature-Key-Id}
+      nonce-status-header: ${NONCE_STATUS_HEADER:X-Sentra-Nonce-Status}
+      nonce-accepted-value: ${NONCE_ACCEPTED_VALUE:accepted}
+    limits:
+      max-request-body-bytes: ${MAX_REQUEST_BODY_BYTES:16384}
+      max-merchant-reference-length: ${MAX_MERCHANT_REFERENCE_LENGTH:128}
+      max-description-length: ${MAX_DESCRIPTION_LENGTH:255}
+      max-amount: ${MAX_AMOUNT:10000.00}
+      currency-allowed-values: ${CURRENCY_ALLOWED_VALUES:}
+      max-error-details: ${MAX_ERROR_DETAILS:20}
+    idempotency:
+      enabled: ${IDEMPOTENCY_ENABLED:true}
+      required-for-mutations: ${IDEMPOTENCY_KEY_REQUIRED_FOR_MUTATIONS:true}
+      key-max-length: ${IDEMPOTENCY_KEY_MAX_LENGTH:128}
+      retention: ${IDEMPOTENCY_RETENTION:24h}
+      max-records: ${IDEMPOTENCY_MAX_RECORDS:10000}
+      cleanup-interval: ${IDEMPOTENCY_CLEANUP_INTERVAL:5m}
+    management:
+      port: ${MANAGEMENT_PORT:${SERVER_PORT:8083}}
+      allowed-cidrs: ${MANAGEMENT_ALLOWED_CIDRS:}
+      openapi-enabled: ${OPENAPI_ENABLED:false}
+      swagger-ui-enabled: ${SWAGGER_UI_ENABLED:false}
+      metrics-enabled: ${METRICS_ENABLED:true}
+    logging:
+      format: ${LOG_FORMAT:text}
+      include-payment-ids: ${LOG_INCLUDE_PAYMENT_IDS:false}
+      include-client-ids: ${LOG_INCLUDE_CLIENT_IDS:false}
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.omar.sentra.payment: INFO
